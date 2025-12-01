@@ -6,12 +6,11 @@ import {
   BInput,
   BTabs,
   BTabItem,
-  BCollapse,
   BIcon,
   BTooltip,
 } from "buefy"
+import PasswordManager from "./components/PasswordManager.ce.vue"
 import { Buffer } from "buffer"
-import * as bip39 from "bip39"
 import buefyCss from "./styles/buefy-custom.scss?inline"
 
 // Make Buffer available globally for bip39
@@ -22,52 +21,7 @@ const password = ref("")
 const passwordMnemonic = ref("")
 const encryptedText = ref("")
 
-// Generate a random password
-const generatePassword = (length = 16) => {
-  const charset =
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*-_=+"
-  const randomValues = new Uint8Array(length)
-  crypto.getRandomValues(randomValues)
 
-  return Array.from(randomValues)
-    .map((value) => charset[value % charset.length])
-    .join("")
-}
-
-// Generate BIP39 mnemonic from password
-const passwordToMnemonic = (password) => {
-  // Hash the password to get consistent bytes
-  const encoder = new TextEncoder()
-  const passwordBytes = encoder.encode(password)
-
-  // Create a hash to get 128 bits (12 words) or 256 bits (24 words)
-  const hashBuffer = crypto.subtle.digest("SHA-256", passwordBytes)
-
-  return hashBuffer.then((hash) => {
-    // Use first 128 bits for 12-word mnemonic
-    const entropy = new Uint8Array(hash).slice(0, 16)
-    return bip39.entropyToMnemonic(
-      Array.from(entropy)
-        .map((b) => b.toString(16).padStart(2, "0"))
-        .join("")
-    )
-  })
-}
-
-// Generate mnemonic from entropy (for new passwords)
-const generateMnemonicPassword = () => {
-  // Generate 128 bits of entropy (12 words)
-  const mnemonic = bip39.generateMnemonic(128)
-
-  // Derive a password from the mnemonic
-  const seed = bip39.mnemonicToSeedSync(mnemonic)
-  const passwordBytes = seed.slice(0, 32)
-
-  // Convert to base64 for a readable password
-  const password = arrayBufferToBase64(passwordBytes).substring(0, 24)
-
-  return { password, mnemonic }
-}
 
 // Modern base64 encoding (replaces deprecated btoa)
 const arrayBufferToBase64 = (buffer) => {
@@ -152,9 +106,6 @@ const setAttributes = (element, attributes) => {
 
 // Generate password on component load
 onMounted(() => {
-  const { password: newPassword, mnemonic } = generateMnemonicPassword()
-  password.value = newPassword
-  passwordMnemonic.value = mnemonic
 
   // Inject Material Design Icons stylesheet
   const fontImport = document.createElement("link")
@@ -198,62 +149,13 @@ const handleClear = () => {
   encryptedText.value = ""
 }
 
-const handleGenerateNewPassword = () => {
-  const { password: newPassword, mnemonic } = generateMnemonicPassword()
-  password.value = newPassword
-  passwordMnemonic.value = mnemonic
-}
+// Password generation and management are handled by the PasswordManager component
 </script>
 
 <template>
   <div class="pasteref">
-    <b-collapse class="card" animation="slide" aria-id="password-panel">
-      <template #trigger="props">
-        <div class="card-header" role="button" aria-controls="password-panel">
-          <p class="card-header-title">
-            <b-tooltip
-              position="is-right"
-              label="Key loaded, you can now encrypt!"
-            >
-              <b-icon icon="check-circle" type="is-success"></b-icon>
-            </b-tooltip>
-            Password Management
-          </p>
-          <a class="card-header-icon">
-            <b-icon :icon="props.open ? 'menu-down' : 'menu-up'"> </b-icon>
-          </a>
-        </div>
-      </template>
-
-      <div class="card-content">
-        <b-field label="Password" label-position="on-border" grouped>
-          <b-input
-            v-model="password"
-            type="password"
-            expanded
-            password-reveal
-            readonly
-          ></b-input>
-          <p class="control">
-            <b-button @click="handleGenerateNewPassword" icon-left="refresh">
-              Regenerate
-            </b-button>
-          </p>
-        </b-field>
-
-        <b-field
-          label="Password Mnemonic (BIP39 - 12 words)"
-          label-position="on-border"
-        >
-          <b-input
-            v-model="passwordMnemonic"
-            type="password"
-            password-reveal
-            readonly
-          ></b-input>
-        </b-field>
-      </div>
-    </b-collapse>
+    <PasswordManager v-model:password="password" v-model:passwordMnemonic="passwordMnemonic" />
+    
 
     <b-tabs>
       <b-tab-item label="Plain text">
