@@ -2,28 +2,9 @@
 import { ref, computed, onMounted } from "vue"
 import { BButton, BField, BInput, BCollapse, BIcon, BTooltip } from "buefy"
 import * as bip39 from "bip39"
+import { usePastebinStore } from "../stores/pastebin.js"
 
-const props = defineProps({
-  password: {
-    type: String,
-    default: "",
-  },
-  passwordMnemonic: {
-    type: String,
-    default: "",
-  },
-})
-const emit = defineEmits(["update:password", "update:passwordMnemonic"])
-
-const passwordComputed = computed({
-  get: () => props.password,
-  set: (val) => emit("update:password", val),
-})
-
-const mnemonicComputed = computed({
-  get: () => props.passwordMnemonic,
-  set: (val) => emit("update:passwordMnemonic", val),
-})
+const store = usePastebinStore()
 
 // Modern base64 encoding helper
 const arrayBufferToBase64 = (buffer) => {
@@ -52,16 +33,17 @@ const generateMnemonicPassword = () => {
 
 const handleGenerateNewPassword = () => {
   const { password: newPassword, mnemonic } = generateMnemonicPassword()
-  passwordComputed.value = newPassword
-  mnemonicComputed.value = mnemonic
+  store.setPassword(newPassword)
+  store.setPasswordMnemonic(mnemonic)
 }
 
-// If parent didn't set a password, generate one on mount
+// Password generation on mount
 onMounted(() => {
-  if (!props.password) {
+  if (!store.password) {
     const { password: newPassword, mnemonic } = generateMnemonicPassword()
-    passwordComputed.value = newPassword
-    mnemonicComputed.value = mnemonic
+    store.setPassword(newPassword)
+    store.setPasswordMnemonic(mnemonic)
+    console.log('Generated password on mount:', newPassword)
   }
 })
 </script>
@@ -85,7 +67,7 @@ onMounted(() => {
     <div class="card-content">
       <b-field label="Password" label-position="on-border" grouped>
         <b-input
-          v-model="passwordComputed"
+          :value="store.password"
           type="password"
           expanded
           password-reveal
@@ -103,7 +85,7 @@ onMounted(() => {
         label-position="on-border"
       >
         <b-input
-          v-model="mnemonicComputed"
+          :value="store.passwordMnemonic"
           type="password"
           password-reveal
           readonly

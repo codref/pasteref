@@ -7,8 +7,8 @@
   "module": "./dist/pasteref.es.js",
   "exports": {
     ".": {
-  "import": "./dist/pasteref.es.js",
-  "require": "./dist/pasteref.umd.js"
+      "import": "./dist/pasteref.es.js",
+      "require": "./dist/pasteref.umd.js"
     }
   },
   "files": [
@@ -24,12 +24,13 @@
     "buefy": "^3.0.3",
     "buffer": "^6.0.3",
     "bulma": "^1.0.4",
+    "pinia": "^3.0.4",
     "vue": "^3.4.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.0",
-    "vite": "^5.0.0",
     "sass": "^1.70.0",
-    "sass-loader": "^13.3.0"
+    "sass-loader": "^13.3.0",
+    "vite": "^5.0.0"
   }
 }
