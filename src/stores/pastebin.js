@@ -1,15 +1,22 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 
 export const usePastebinStore = defineStore('pastebin', () => {
   const pasteContent = ref('')
   const password = ref('')
   const passwordMnemonic = ref('')
   const encryptedText = ref('')
-  const shortUrl = ref('')
+  const encodedURL = ref('')
   const activeTab = ref(0)
   const loadedPlainFile = ref(null)
   const loading = ref(false)
+  const decryptError = ref(false)
+  const includePasswordInUrl = ref(true)
+
+  // Computed properties
+  const hasPasswordInUrl = computed(() => {
+    return encodedURL.value.includes('~')
+  })
 
   // Actions
   const setPasteContent = (content) => {
@@ -28,8 +35,8 @@ export const usePastebinStore = defineStore('pastebin', () => {
     encryptedText.value = text
   }
 
-  const setShortUrl = (url) => {
-    shortUrl.value = url
+  const setEncodedURL = (url) => {
+    encodedURL.value = url
   }
 
   const setActiveTab = (tab) => {
@@ -39,6 +46,7 @@ export const usePastebinStore = defineStore('pastebin', () => {
   const clearAll = () => {
     pasteContent.value = ''
     encryptedText.value = ''
+    encodedURL.value = ''
     loadedPlainFile.value = null
     loading.value = false
   }
@@ -49,6 +57,14 @@ export const usePastebinStore = defineStore('pastebin', () => {
 
   const setLoading = (isLoading) => {
     loading.value = isLoading
+  }
+
+  const setDecryptError = (hasError) => {
+    decryptError.value = hasError
+  }
+
+  const setIncludePasswordInUrl = (include) => {
+    includePasswordInUrl.value = include
   }
 
   // Handle file loading
@@ -74,21 +90,26 @@ export const usePastebinStore = defineStore('pastebin', () => {
     password,
     passwordMnemonic,
     encryptedText,
-    shortUrl,
+    encodedURL,
     activeTab,
     loadedPlainFile,
     loading,
+    decryptError,
+    includePasswordInUrl,
+    hasPasswordInUrl,
 
     // Actions
     setPasteContent,
     setPassword,
     setPasswordMnemonic,
     setEncryptedText,
-    setShortUrl,
+    setEncodedURL,
     setActiveTab,
     clearAll,
     setLoadedPlainFile,
     setLoading,
+    setDecryptError,
+    setIncludePasswordInUrl,
     onLoadPlainFileClick
   }
 })

@@ -98,3 +98,41 @@ export const encryptText = async (plaintext, password) => {
   // Step 6: Convert to base64 using modern approach
   return arrayBufferToBase64(combined)
 }
+
+// Decrypt the text (with decompression)
+export const decryptText = async (encryptedBase64, password) => {
+  try {
+    // Step 1: Convert base64 to ArrayBuffer
+    const binaryString = atob(encryptedBase64)
+    const bytes = new Uint8Array(binaryString.length)
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i)
+    }
+
+    // Step 2: Extract salt, IV, and ciphertext
+    const salt = bytes.slice(0, 16)
+    const iv = bytes.slice(16, 28)
+    const ciphertext = bytes.slice(28)
+
+    // Step 3: Derive key from password
+    const key = await deriveKey(password, salt)
+
+    // Step 4: Decrypt the data
+    const decrypted = await crypto.subtle.decrypt(
+      { name: "AES-GCM", iv },
+      key,
+      ciphertext
+    )
+
+    // Step 5: Decompress the data using gzip
+    const stream = new Blob([decrypted]).stream()
+    const decompressedStream = stream.pipeThrough(new DecompressionStream("gzip"))
+    const decompressedBlob = await new Response(decompressedStream).blob()
+    const plaintext = await decompressedBlob.text()
+
+    return plaintext
+  } catch (error) {
+    console.error('Decryption error:', error)
+    throw new Error('Decryption failed. Please check your password and encrypted text.')
+  }
+}
