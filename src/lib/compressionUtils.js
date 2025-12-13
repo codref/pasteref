@@ -34,22 +34,13 @@ export const decodeAndDecompress = async (base64Data) => {
       bytes[i] = binaryString.charCodeAt(i)
     }
 
-    // Create a decompression stream
-    const decompressedStream = new DecompressionStream('gzip')
-    const writer = decompressedStream.writable.getWriter()
+    // Create a stream from the bytes
+    const stream = new Blob([bytes]).stream()
+    const decompressedStream = stream.pipeThrough(new DecompressionStream('gzip'))
+    const decompressedBlob = await new Response(decompressedStream).blob()
+    const plaintext = await decompressedBlob.text()
 
-    // Write compressed data to the stream
-    await writer.write(bytes)
-    await writer.close()
-
-    // Read decompressed data from the stream
-    const decompressedData = await new Response(
-      decompressedStream.readable
-    ).arrayBuffer()
-
-    // Convert back to string
-    const decoder = new TextDecoder()
-    return decoder.decode(decompressedData)
+    return plaintext
   } catch (error) {
     throw new Error(`Decompression failed: ${error.message}`)
   }

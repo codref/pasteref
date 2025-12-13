@@ -1,11 +1,15 @@
 <script setup>
-import { inject } from "vue"
+import { inject, computed } from "vue"
 import { BField, BInput, BButton, BUpload, BTooltip } from "buefy"
 import { usePastebinStore } from "../stores/pastebin.js"
 import { decryptText } from "../lib/cryptoUtils.js"
+import { getFieldSize } from "../lib/fieldUtils.js"
 
 const store = usePastebinStore()
 const notify = inject('notify')
+
+// Computed property for field message showing content length and bytes
+const fieldMessage = computed(() => getFieldSize(store.encryptedText))
 
 const handleDecrypt = async () => {
   if (!store.encryptedText || !store.password) {
@@ -28,11 +32,13 @@ const handleDecrypt = async () => {
     store.setLoading(false)
   }
 }
+
+defineExpose({ handleDecrypt })
 </script>
 
 <template>
-  <b-field label="Encrypted & Compressed Text (Base64)">
-    <b-input v-model="store.encryptedText" type="textarea" :rows="6" />
+  <b-field label="Encrypted & Compressed Text (Base64)" :message="fieldMessage">
+    <b-input v-model="store.encryptedText" type="textarea" :rows="6" class="monospace-textarea" />
   </b-field>
   <div class="is-expanded">
     <b-upload :value="store.loadedPlainFile" @input="(file) => { store.setLoadedPlainFile(file); store.onLoadPlainFileClick(file); }">

@@ -28,3 +28,10 @@ $link-color: #fa7c91;
 // Import Buefy styles
 @use "buefy/src/scss/buefy";
 
+// Force monospace font for textarea inputs
+.monospace-textarea textarea {
+  font-family: 'Courier New', Courier, 'Monaco', 'Consolas', 'Ubuntu Mono', monospace !important;
+  font-size: 0.85em !important;
+  letter-spacing: 0;
+}
+

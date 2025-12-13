@@ -11,6 +11,7 @@ const notify = inject('notify')
 const isMnemonicModalOpen = ref(false)
 const inputMnemonic = ref('')
 const skipMnemonicWatch = ref(false)
+const isPasswordPanelOpen = ref(false)
 
 const isWeakPassword = computed(() => {
   const pwd = store.password;
@@ -171,7 +172,7 @@ watch(() => store.password, async (newPassword) => {
 })</script>
 
 <template>
-  <b-collapse class="card" animation="slide" aria-id="password-panel">
+  <b-collapse class="card" animation="slide" aria-id="password-panel" v-model="isPasswordPanelOpen">
     <template #trigger="props">
       <div class="card-header" role="button" aria-controls="password-panel">
         <p class="card-header-title">

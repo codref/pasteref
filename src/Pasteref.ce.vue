@@ -1,6 +1,7 @@
 <script setup>
-import { ref, onMounted, onUnmounted, getCurrentInstance, defineProps, provide, nextTick } from "vue"
-import { BButton, BField, BInput, BTabs, BTabItem, BCheckboxButton, BIcon} from "buefy"
+import { ref, onMounted, onUnmounted, getCurrentInstance, defineProps, provide, nextTick, computed } from "vue"
+import { BButton, BField, BInput, BTabs, BTabItem, BCheckboxButton, BIcon, BModal} from "buefy"
+import QRCode from 'qrcode'
 import PasswordManager from "./components/PasswordManager.ce.vue"
 import ClearTextTab from "./components/ClearTextTab.ce.vue"
 import EncryptedTextTab from "./components/EncryptedTextTab.ce.vue"
@@ -9,6 +10,7 @@ import { Buffer } from "buffer"
 import buefyCss from "./styles/buefy-custom.scss?inline"
 import { setAttributes } from "./lib/domUtils.js"
 import { copyToClipboard } from "./lib/clipboardUtils.js"
+import { decodeAndDecompress } from "./lib/compressionUtils.js"
 
 const props = defineProps({
   baseUrl: {
@@ -23,8 +25,15 @@ window.Buffer = Buffer
 // Use Pinia store
 const store = usePastebinStore()
 
+// Add ref for EncryptedTextTab
+const encryptedTab = ref()
+
 // Add password to URL checkbox state
 const includePasswordInUrl = ref(false)
+
+// QR code modal state
+const isQRCodeModalOpen = ref(false)
+const qrCodeDataUrl = ref('')
 
 // Notification reactive variables
 const notifyActive = ref(false)
@@ -59,6 +68,50 @@ const handleCopyUrl = async () => {
   }
 }
 
+// Handle open in new tab
+const handleOpenInNewTab = () => {
+  if (store.encodedURL) {
+    window.open(props.baseUrl + store.encodedURL, '_blank')
+  }
+}
+
+// Handle open QR code modal
+const handleOpenQRCodeModal = async () => {
+  if (store.encodedURL) {
+    try {
+      const fullUrl = props.baseUrl + store.encodedURL
+      qrCodeDataUrl.value = await QRCode.toDataURL(fullUrl, {
+        errorCorrectionLevel: 'H',
+        type: 'image/png',
+        quality: 0.95,
+        margin: 1,
+        width: 300
+      })
+      isQRCodeModalOpen.value = true
+    } catch (error) {
+      console.error('QR code generation error:', error)
+      notify('Failed to generate QR code', 'is-danger')
+    }
+  }
+}
+
+// Handle copy QR code image
+const handleCopyQRCode = async () => {
+  if (qrCodeDataUrl.value) {
+    try {
+      const response = await fetch(qrCodeDataUrl.value)
+      const blob = await response.blob()
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blob })
+      ])
+      notify('QR code copied to clipboard!', 'is-success')
+    } catch (error) {
+      console.error('Failed to copy QR code:', error)
+      notify('Failed to copy QR code to clipboard', 'is-danger')
+    }
+  }
+}
+
 // Handle hash change to load encrypted content
 const handleHashChange = async () => {
   const hash = window.location.hash.substring(1)
@@ -76,6 +129,20 @@ const handleHashChange = async () => {
     }
     await nextTick()
     store.setActiveTab(1) // Switch to Encrypted tab
+    if (store.encryptedText && store.password) {
+      await nextTick()
+      encryptedTab.value?.handleDecrypt()
+    } else if (store.encryptedText && !store.password) {
+      try {
+        const decompressedText = await decodeAndDecompress(store.encryptedText)
+        store.setPasteContent(decompressedText)
+        store.setActiveTab(0) // Switch to Plain Text tab
+        notify('Decompression successful!', 'is-success')
+      } catch (error) {
+        console.error('Decompression error:', error)
+        notify(error.message || 'Decompression failed. Please check the compressed text.', 'is-danger')
+      }
+    }
   }
 }
 
@@ -129,10 +196,16 @@ onUnmounted(() => {
       <p class="control">
         <span class="button is-static">{{ baseUrl }}</span>
       </p>
-      <b-input :value="store.encodedURL" placeholder="Your encoded URL" expanded readonly></b-input>
+      <b-input :value="store.encodedURL" placeholder="Your encoded URL" expanded readonly></b-input>      
       <p class="control">
         <b-button type="is-primary" label="Copy long URL" :disabled="!store.encodedURL" @click="handleCopyUrl" />
       </p>
+      <p class="control">
+        <b-button type="is-primary" icon-right="qrcode" :disabled="!store.encodedURL" @click="handleOpenQRCodeModal" />
+      </p>
+      <p class="control">
+        <b-button type="is-primary" icon-right="open-in-new" :disabled="!store.encodedURL" @click="handleOpenInNewTab" />
+      </p>            
     </b-field>
 
     <PasswordManager />
@@ -145,7 +218,7 @@ onUnmounted(() => {
       </b-tab-item>
 
       <b-tab-item label="Encrypted">
-        <EncryptedTextTab />
+        <EncryptedTextTab ref="encryptedTab" />
       </b-tab-item>
     </b-tabs>
 
@@ -154,6 +227,26 @@ onUnmounted(() => {
       <div class="custom-notification-content" v-html="notifyMessage">
       </div>
     </div>
+
+    <b-modal v-model="isQRCodeModalOpen" has-modal-card>
+      <div class="modal-card">
+        <header class="modal-card-head">
+          <p class="modal-card-title">Share URL as QR Code</p>
+        </header>
+        <section class="modal-card-body has-text-centered">
+          <img v-if="qrCodeDataUrl" :src="qrCodeDataUrl" alt="QR Code" style="max-width: 300px; margin: 0 auto;" />
+          <p style="margin-top: 1rem; font-size: 0.875rem; color: #666;">
+            Scan to share the pasted content
+          </p>
+        </section>
+        <footer class="modal-card-foot">
+          <div class="buttons is-pulled-right" position="is-right">
+            <b-button @click="isQRCodeModalOpen = false">Close</b-button>
+            <b-button @click="handleCopyQRCode" type="is-info" icon-left="content-copy">Copy QR Code</b-button>
+          </div>
+        </footer>
+      </div>
+    </b-modal>
   </div>
 </template>
 

@@ -3,6 +3,7 @@ import { BButton, BField, BInput, BUpload, BTooltip, BIcon, BCheckboxButton } fr
 import { usePastebinStore } from "../stores/pastebin.js"
 import { generateMnemonicPassword, encryptText } from "../lib/cryptoUtils.js"
 import { compressAndEncode } from "../lib/compressionUtils.js"
+import { getFieldSize } from "../lib/fieldUtils.js"
 import { computed, inject } from "vue"
 
 const store = usePastebinStore()
@@ -10,21 +11,7 @@ const notify = inject('notify')
 const copyUrl = inject('copyUrl')
 
 // Computed property for field message showing content length and bytes
-const fieldMessage = computed(() => {
-  if (!store.pasteContent) return ""
-  const charCount = store.pasteContent.length
-  const byteCount = new TextEncoder().encode(store.pasteContent).length
-
-  // Format bytes with appropriate unit
-  let formattedSize
-  if (byteCount < 1024) {
-    formattedSize = `${byteCount} B`
-  } else if (byteCount < 1024 * 1024) {
-    formattedSize = `${(byteCount / 1024).toFixed(1)} KB`
-  }
-
-  return `${charCount} characters (${formattedSize})`
-})
+const fieldMessage = computed(() => getFieldSize(store.pasteContent))
 
 const handleEncrypt = async () => {
   if (!store.pasteContent) {
@@ -48,6 +35,7 @@ const handleEncrypt = async () => {
     store.setEncodedURL(encodedUrl)
 
     await copyUrl()
+    store.setActiveTab(1) // Switch to Encrypted tab
     notify('Content encrypted successfully!<br>URL copied to clipboard!', 'is-success')
   } catch (error) {
     console.error("Encryption error:", error)
@@ -76,7 +64,7 @@ const handlePasteClear = async () => {
 
 <template>
   <b-field label="Enter your paste content" :message="fieldMessage">
-    <b-input v-model="store.pasteContent" type="textarea" placeholder="Type your text here..." :rows="10" />
+    <b-input class="monospace-textarea" v-model="store.pasteContent" type="textarea" placeholder="Type your text here..." :rows="12" />
   </b-field>
 
   <div class="is-expanded">
