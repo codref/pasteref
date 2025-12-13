@@ -4,14 +4,36 @@ import { usePastebinStore } from "../stores/pastebin.js"
 import { generateMnemonicPassword, encryptText } from "../lib/cryptoUtils.js"
 import { compressAndEncode } from "../lib/compressionUtils.js"
 import { getFieldSize } from "../lib/fieldUtils.js"
-import { computed, inject } from "vue"
+import { computed, inject, onMounted, ref } from "vue"
+import Prism from "prismjs"
+import "prismjs/themes/prism.css"
+import "prismjs/components/prism-markdown.js"
 
 const store = usePastebinStore()
 const notify = inject('notify')
 const copyUrl = inject('copyUrl')
+const textareaRef = ref(null)
+const highlightedCode = ref('')
 
 // Computed property for field message showing content length and bytes
 const fieldMessage = computed(() => getFieldSize(store.pasteContent))
+
+// Update highlighted code when paste content changes
+const updateHighlight = () => {
+  highlightedCode.value = Prism.highlight(
+    store.pasteContent,
+    Prism.languages.markdown,
+    'markdown'
+  )
+}
+
+onMounted(() => {
+  updateHighlight()
+})
+
+const handleContentChange = () => {
+  updateHighlight()
+}
 
 const handleEncrypt = async () => {
   if (!store.pasteContent) {
@@ -64,7 +86,17 @@ const handlePasteClear = async () => {
 
 <template>
   <b-field label="Enter your paste content" :message="fieldMessage">
-    <b-input class="monospace-textarea" v-model="store.pasteContent" type="textarea" placeholder="Type your text here..." :rows="12" />
+    <div class="syntax-highlighter-container">
+      <b-input 
+        ref="textareaRef"
+        v-model="store.pasteContent" 
+        @input="handleContentChange"
+        type="textarea" 
+        placeholder="Type your text here..." 
+        :rows="12" 
+      />
+      <pre class="syntax-highlighter-overlay"><code v-html="highlightedCode" class="language-markdown"></code></pre>
+    </div>
   </b-field>
 
   <div class="is-expanded">
@@ -84,5 +116,50 @@ const handlePasteClear = async () => {
   </div>
 </template>
 
-<style lang="scss">
+<style lang="scss" scoped>
+.syntax-highlighter-container {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+::v-deep .b-input {
+  position: relative;
+  z-index: 2;
+
+  textarea {
+    background-color: rgba(245, 245, 245, 0.9) !important;
+    font-family: 'Courier New', monospace !important;
+    font-size: 1rem !important;
+  }
+}
+
+.syntax-highlighter-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
+  padding: 0.625rem;
+  border: 1px solid #dbdbdb;
+  border-radius: 4px;
+  background-color: #f5f5f5;
+  font-family: 'Courier New', monospace;
+  font-size: 1rem;
+  line-height: 1.5;
+  overflow: hidden;
+  pointer-events: none;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+  z-index: 1;
+  width: 100%;
+  box-sizing: border-box;
+
+  code {
+    color: inherit;
+    background: none;
+    padding: 0;
+    font-family: 'Courier New', monospace;
+    display: block;
+  }
+}
 </style>
