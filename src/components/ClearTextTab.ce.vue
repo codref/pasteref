@@ -1,39 +1,19 @@
 <script setup>
-import { BButton, BField, BInput, BUpload, BTooltip, BIcon, BCheckboxButton } from "buefy"
+import { BButton, BField, BInput, BTooltip, BIcon, BCheckboxButton } from "buefy"
 import { usePastebinStore } from "../stores/pastebin.js"
 import { generateMnemonicPassword, encryptText } from "../lib/cryptoUtils.js"
 import { compressAndEncode } from "../lib/compressionUtils.js"
 import { getFieldSize } from "../lib/fieldUtils.js"
-import { computed, inject, onMounted, ref } from "vue"
-import Prism from "prismjs"
-import "prismjs/themes/prism.css"
-import "prismjs/components/prism-markdown.js"
+import { computed, inject, ref } from "vue"
 
 const store = usePastebinStore()
 const notify = inject('notify')
 const copyUrl = inject('copyUrl')
 const textareaRef = ref(null)
-const highlightedCode = ref('')
+const fileInput = ref(null)
 
 // Computed property for field message showing content length and bytes
 const fieldMessage = computed(() => getFieldSize(store.pasteContent))
-
-// Update highlighted code when paste content changes
-const updateHighlight = () => {
-  highlightedCode.value = Prism.highlight(
-    store.pasteContent,
-    Prism.languages.markdown,
-    'markdown'
-  )
-}
-
-onMounted(() => {
-  updateHighlight()
-})
-
-const handleContentChange = () => {
-  updateHighlight()
-}
 
 const handleEncrypt = async () => {
   if (!store.pasteContent) {
@@ -82,31 +62,48 @@ const handlePasteClear = async () => {
     alert("Compression failed")
   }
 }
+
+const handleFileUpload = () => {
+  const file = fileInput.value.files[0]
+  if (!file) return
+
+  const loadedFileSizeMb = file.size / 1024 ** 2
+  if (loadedFileSizeMb > 2) {
+    notify("The uploaded file exceeds the limit of 2MB.", "is-danger")
+    return
+  }
+
+  store.setLoading(true)
+  const reader = new FileReader()
+  reader.onload = () => {
+    store.setPasteContent(reader.result)
+    store.setLoading(false)
+  }
+  reader.onerror = () => {
+    notify("Error loading file", "is-danger")
+    store.setLoading(false)
+  }
+  reader.readAsText(file)
+}
 </script>
 
 <template>
   <b-field label="Enter your paste content" :message="fieldMessage">
-    <div class="syntax-highlighter-container">
-      <b-input 
-        ref="textareaRef"
-        v-model="store.pasteContent" 
-        @input="handleContentChange"
-        type="textarea" 
-        placeholder="Type your text here..." 
-        :rows="12" 
-      />
-      <pre class="syntax-highlighter-overlay"><code v-html="highlightedCode" class="language-markdown"></code></pre>
-    </div>
+    <b-input
+      ref="textareaRef"
+      v-model="store.pasteContent"
+      type="textarea"
+      placeholder="Type your text here..."
+      :rows="12"
+    />
   </b-field>
 
   <div class="is-expanded">
     <div class="buttons is-pulled-left" position="is-left">
-    <b-upload :value="store.loadedPlainFile"
-      @input="(file) => { store.setLoadedPlainFile(file); store.onLoadPlainFileClick(file); }">
-      <b-tooltip label="The loaded file is converted to a UTF-8 message" position="is-right">
-        <a :class="`button is-pulled-left ${store.loading ? 'is-loading' : ''}`">Load plain message from file</a>
-      </b-tooltip>
-    </b-upload>
+    <input type="file" ref="fileInput" @change="handleFileUpload" style="display: none">
+    <b-tooltip label="The loaded file is converted to a UTF-8 message" position="is-right">
+      <a :class="`button is-pulled-left ${store.loading ? 'is-loading' : ''}`" @click="fileInput.click()">Load plain message from file</a>
+    </b-tooltip>
     </div>
     <div class="buttons is-pulled-right" position="is-right">
       <b-button @click="handlePasteClear" :disabled="!store.pasteContent">Paste clear</b-button>
@@ -117,49 +114,4 @@ const handlePasteClear = async () => {
 </template>
 
 <style lang="scss" scoped>
-.syntax-highlighter-container {
-  position: relative;
-  display: block;
-  width: 100%;
-}
-
-::v-deep .b-input {
-  position: relative;
-  z-index: 2;
-
-  textarea {
-    background-color: rgba(245, 245, 245, 0.9) !important;
-    font-family: 'Courier New', monospace !important;
-    font-size: 1rem !important;
-  }
-}
-
-.syntax-highlighter-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  margin: 0;
-  padding: 0.625rem;
-  border: 1px solid #dbdbdb;
-  border-radius: 4px;
-  background-color: #f5f5f5;
-  font-family: 'Courier New', monospace;
-  font-size: 1rem;
-  line-height: 1.5;
-  overflow: hidden;
-  pointer-events: none;
-  word-wrap: break-word;
-  white-space: pre-wrap;
-  z-index: 1;
-  width: 100%;
-  box-sizing: border-box;
-
-  code {
-    color: inherit;
-    background: none;
-    padding: 0;
-    font-family: 'Courier New', monospace;
-    display: block;
-  }
-}
 </style>
