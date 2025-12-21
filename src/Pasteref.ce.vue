@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, onUnmounted, getCurrentInstance, defineProps, provide, nextTick, computed, watch } from "vue"
-import { BCheckbox, BIcon, BTooltip, BNotification, BButton, BField, BInput, BTabs, BTabItem, BModal } from "buefy"
+import { BCheckbox, BIcon, BTooltip, BButton, BField, BInput, BTabs, BTabItem, BModal } from "buefy"
 import QRCode from 'qrcode'
 import PasswordManager from "./components/PasswordManager.ce.vue"
 import ClearTextTab from "./components/ClearTextTab.ce.vue"
@@ -120,6 +120,23 @@ const handleCopyQRCode = async () => {
     } catch (error) {
       console.error('Failed to copy QR code:', error)
       notify('Failed to copy QR code to clipboard', 'is-danger')
+    }
+  }
+}
+
+// Handle copy minified QR code image
+const handleCopyMinifiedQRCode = async () => {
+  if (minifiedQrCodeDataUrl.value) {
+    try {
+      const response = await fetch(minifiedQrCodeDataUrl.value)
+      const blob = await response.blob()
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'image/png': blob })
+      ])
+      notify('Minified QR code copied to clipboard!', 'is-success')
+    } catch (error) {
+      console.error('Failed to copy minified QR code:', error)
+      notify('Failed to copy minified QR code to clipboard', 'is-danger')
     }
   }
 }
@@ -261,15 +278,6 @@ watch(() => store.includePasswordInUrl, async () => {
   }
 })
 
-// Watch for changes in encodedURL and generate minified URL if enabled
-// watch(() => store.encodedURL, async (newUrl) => {
-//   if (newUrl && store.generateShortUrl) {
-//     await generateMinifiedUrl()
-//   }
-// })
-
-
-
 // Watch for minified URL changes and generate QR code
 watch(() => store.minifiedUrl, async (newMinifiedUrl) => {
   if (newMinifiedUrl) {
@@ -336,7 +344,7 @@ onUnmounted(() => {
           <div class="media-left">
             <figure class="image is-100x100">
               <img v-if="store.minifiedUrl" :src="minifiedQrCodeDataUrl" alt="QR Code"
-                style="width: 100px; height: 100px;" />
+                style="width: 100px; height: 100px; cursor: pointer;" @click="handleCopyMinifiedQRCode" title="Click to copy minified QR code" />
             </figure>
           </div>
           <div class="media-content">
@@ -368,7 +376,7 @@ onUnmounted(() => {
       </p>
       <b-input v-if="!isMobile()" :value="store.encodedURL" placeholder="Your encoded URL" expanded readonly></b-input>
       <p class="control" :class="{ 'is-expanded': isMobile() }">
-        <b-button :expanded="isMobile()" type="is-primary" label="Copy long URL" :disabled="!store.encodedURL"
+        <b-button :expanded="isMobile()" type="is-primary" icon-left="content-copy" label="Copy long URL" :disabled="!store.encodedURL"
           @click="handleCopyUrl" />
       </p>
       <p class="control">
@@ -421,9 +429,9 @@ onUnmounted(() => {
           <p class="modal-card-title">Share URL as QR Code</p>
         </header>
         <section class="modal-card-body has-text-centered">
-          <img v-if="qrCodeDataUrl" :src="qrCodeDataUrl" alt="QR Code" style="max-width: 300px; margin: 0 auto;" />
+          <img v-if="qrCodeDataUrl" :src="qrCodeDataUrl" alt="QR Code" style="max-width: 300px; margin: 0 auto; cursor: pointer;" @click="handleCopyQRCode" title="Click to copy QR code" />
           <p style="margin-top: 1rem; font-size: 0.875rem; color: #666;">
-            Scan to share the pasted content
+            Scan to share the pasted content (click image to copy)
           </p>
         </section>
         <footer class="modal-card-foot">
