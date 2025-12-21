@@ -2,6 +2,7 @@
   "name": "pasteref",
   "version": "1.0.0",
   "description": "A Vue 3 Web Component for pasteref",
+  "license": "GPL-3.0-only",
   "type": "module",
   "main": "./dist/pasteref.umd.js",
   "module": "./dist/pasteref.es.js",
