@@ -12,6 +12,8 @@ export const usePastebinStore = defineStore('pastebin', () => {
   const loading = ref(false)
   const decryptError = ref(false)
   const includePasswordInUrl = ref(true)
+  const generateShortUrl = ref(true)
+  const minifiedUrl = ref('')
 
   // Computed properties
   const hasPasswordInUrl = computed(() => {
@@ -67,6 +69,10 @@ export const usePastebinStore = defineStore('pastebin', () => {
     includePasswordInUrl.value = include
   }
 
+  const setMinifiedUrl = (url) => {
+    minifiedUrl.value = url
+  }
+
   // Handle file loading
   const onLoadPlainFileClick = async (file) => {
     if (!file) return
@@ -96,6 +102,8 @@ export const usePastebinStore = defineStore('pastebin', () => {
     loading,
     decryptError,
     includePasswordInUrl,
+    generateShortUrl,
+    minifiedUrl,
     hasPasswordInUrl,
 
     // Actions
@@ -110,6 +118,7 @@ export const usePastebinStore = defineStore('pastebin', () => {
     setLoading,
     setDecryptError,
     setIncludePasswordInUrl,
+    setMinifiedUrl,
     onLoadPlainFileClick
   }
 })

@@ -248,7 +248,5 @@ watch(() => store.password, async (newPassword) => {
 </template>
 
 <style scoped>
-.checkbox-button-icon {
-  margin-right: -0.5em !important;
-}
+
 </style>

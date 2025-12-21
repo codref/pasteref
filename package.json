@@ -15,18 +15,20 @@
     "dist"
   ],
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "build": "vite build",
     "preview": "vite build && vite preview"
   },
   "dependencies": {
+    "axios": "^1.13.2",
     "bip39": "^3.1.0",
     "buefy": "^3.0.3",
     "buffer": "^6.0.3",
     "bulma": "^1.0.4",
     "pinia": "^3.0.4",
     "qrcode": "^1.5.4",
-    "vue": "^3.4.0"
+    "vue": "^3.4.0",
+    "vue-axios": "^3.5.2"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.0",

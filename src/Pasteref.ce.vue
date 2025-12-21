@@ -1,6 +1,6 @@
 <script setup>
-import { ref, onMounted, onUnmounted, getCurrentInstance, defineProps, provide, nextTick, computed } from "vue"
-import { BButton, BField, BInput, BTabs, BTabItem, BCheckboxButton, BIcon, BModal} from "buefy"
+import { ref, onMounted, onUnmounted, getCurrentInstance, defineProps, provide, nextTick, computed, watch } from "vue"
+import { BCheckboxButton, BIcon, BTooltip, BNotification, BButton, BField, BInput, BTabs, BTabItem, BModal } from "buefy"
 import QRCode from 'qrcode'
 import PasswordManager from "./components/PasswordManager.ce.vue"
 import ClearTextTab from "./components/ClearTextTab.ce.vue"
@@ -11,11 +11,18 @@ import buefyCss from "./styles/buefy-custom.scss?inline"
 import { setAttributes } from "./lib/domUtils.js"
 import { copyToClipboard } from "./lib/clipboardUtils.js"
 import { decodeAndDecompress } from "./lib/compressionUtils.js"
+import { isMobile } from "./lib/mobileUtils.js"
+import { getMinifiedUrl } from "./lib/urlUtils.js"
+import axios from 'axios'
 
 const props = defineProps({
   baseUrl: {
     type: String,
     default: 'cdrf.at/'
+  },
+  minifyUrl: {
+    type: String,
+    default: "https://api.codref.org/function/terminal/v1/url/minify"
   }
 })
 
@@ -48,12 +55,12 @@ const notify = (message, type = "is-success", duration = 2000) => {
   if (notifyTimeout) {
     clearTimeout(notifyTimeout)
   }
-  
+
   notifyDuration.value = duration
   notifyType.value = type
   notifyMessage.value = message
   notifyActive.value = true
-  
+
   // Auto-close after duration
   notifyTimeout = setTimeout(() => {
     notifyActive.value = false
@@ -85,12 +92,16 @@ const handleOpenQRCodeModal = async () => {
         type: 'image/png',
         quality: 0.95,
         margin: 1,
-        width: 300
+        width: 400
       })
       isQRCodeModalOpen.value = true
     } catch (error) {
       console.error('QR code generation error:', error)
-      notify('Failed to generate QR code', 'is-danger')
+      if (error.message && error.message.includes('too big')) {
+        notify('The URL is too long for a QR code. Please copy the URL instead.', 'is-warning')
+      } else {
+        notify('Failed to generate QR code', 'is-danger')
+      }
     }
   }
 }
@@ -112,6 +123,12 @@ const handleCopyQRCode = async () => {
   }
 }
 
+// Generate minified URL
+const generateMinifiedUrl = async () => {
+  const urlToMinify = props.baseUrl + store.encodedURL.split('~')[0]
+  await getMinifiedUrl(props.minifyUrl, urlToMinify, store.setMinifiedUrl, notify)
+}
+
 // Handle hash change to load encrypted content
 const handleHashChange = async () => {
   const hash = window.location.hash.substring(1)
@@ -120,7 +137,7 @@ const handleHashChange = async () => {
     const parts = hash.split('~')
     const encryptedText = parts[0]
     const password = parts[1] || ''
-    
+
     store.setEncodedURL(hash)
     store.setEncryptedText(encryptedText)
     if (password) {
@@ -149,6 +166,20 @@ const handleHashChange = async () => {
 // Provide notify and copyUrl to child components
 provide('notify', notify)
 provide('copyUrl', handleCopyUrl)
+
+// Watch for changes in encodedURL and generate minified URL if enabled
+watch(() => store.encodedURL, async (newUrl) => {
+  if (newUrl && store.generateShortUrl) {
+    await generateMinifiedUrl()
+  }
+})
+
+// Watch for generateShortUrl toggle and generate if enabled and URL exists
+watch(() => store.generateShortUrl, async (enabled) => {
+  if (enabled && store.encodedURL) {
+    await generateMinifiedUrl()
+  }
+})
 
 // Generate password on component load
 onMounted(async () => {
@@ -192,20 +223,48 @@ onUnmounted(() => {
 <template>
   <div class="pasteref">
 
-    <b-field :message="store.hasPasswordInUrl ? 'Password is included in URL' : ''">
+    <b-notification v-if="store.minifiedUrl != ''" type="is-info is-light" has-icon icon="ghost" :closable="false">
+      <div>
+        <b>{{ store.minifiedUrl }}</b>
+      </div>
+      <p>
+        The shortened URL will last for 72 hours and will be disposed
+        after the first visit, so you should not click it but rather copy
+        it and paste on an email.
+      </p>
+    </b-notification>
+
+    <b-field v-if="isMobile()">
       <p class="control">
         <span class="button is-static">{{ baseUrl }}</span>
       </p>
-      <b-input :value="store.encodedURL" placeholder="Your encoded URL" expanded readonly></b-input>      
-      <p class="control">
-        <b-button type="is-primary" label="Copy long URL" :disabled="!store.encodedURL" @click="handleCopyUrl" />
+      <b-input :value="store.encodedURL" placeholder="Your encoded URL" expanded readonly></b-input>
+    </b-field>
+
+    <b-field :message="store.hasPasswordInUrl ? 'Password is included in URL' : ''">
+      <p class="control" v-if="!isMobile()">
+        <span class="button is-static">{{ baseUrl }}</span>
+      </p>
+      <b-input v-if="!isMobile()" :value="store.encodedURL" placeholder="Your encoded URL" expanded readonly></b-input>
+      <p class="control" :class="{ 'is-expanded': isMobile() }">
+        <b-button :expanded="isMobile()" type="is-primary" label="Copy long URL" :disabled="!store.encodedURL"
+          @click="handleCopyUrl" />
       </p>
       <p class="control">
         <b-button type="is-primary" icon-right="qrcode" :disabled="!store.encodedURL" @click="handleOpenQRCodeModal" />
       </p>
       <p class="control">
-        <b-button type="is-primary" icon-right="open-in-new" :disabled="!store.encodedURL" @click="handleOpenInNewTab" />
-      </p>            
+        <b-button type="is-primary" icon-right="open-in-new" :disabled="!store.encodedURL"
+          @click="handleOpenInNewTab" />
+      </p>
+      <p class="control">
+        <b-tooltip :label="store.generateShortUrl ? 'A new short URL will be generated' : 'No short URL'"
+          position="is-left">
+          <b-checkbox-button v-model="store.generateShortUrl">
+            <b-icon icon="shield-link-variant" class="checkbox-button-icon"></b-icon>
+          </b-checkbox-button>
+        </b-tooltip>
+      </p>
     </b-field>
 
     <PasswordManager />
@@ -253,38 +312,6 @@ onUnmounted(() => {
 <style lang="scss">
 @import url("https://cdn.jsdelivr.net/npm/@mdi/font@7.3.67/css/materialdesignicons.min.css");
 
-.pasteref {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 2rem;
-  font-family: system-ui, -apple-system, sans-serif;
-}
-
-.title {
-  text-align: center;
-  margin-bottom: 2rem;
-}
-
-.buttons {
-  display: flex;
-  gap: 1rem;
-  margin-top: 1rem;
-}
-
-.help-text {
-  margin-top: 2rem;
-  text-align: center;
-  font-size: 0.875rem;
-  color: #666;
-}
-
-code {
-  background-color: #f5f5f5;
-  padding: 0.2em 0.4em;
-  border-radius: 3px;
-  font-family: monospace;
-}
-
 .custom-notification {
   position: fixed;
   top: 2rem;
@@ -293,6 +320,7 @@ code {
   z-index: 9999;
   max-width: 400px;
 }
+
 .custom-notification-content {
   word-wrap: break-word;
   margin: 0 1.5rem 0 0;
