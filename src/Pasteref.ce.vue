@@ -300,9 +300,8 @@ onUnmounted(() => {
 <template>
   <div class="pasteref" data-theme="light">
 
-    <b-notification v-if="store.minifiedUrl != ''" type="is-info is-light" has-icon icon="ghost" :closable="false">
-
-      <div class="box">
+    
+      <div class="box" v-if="store.minifiedUrl != ''">
         <article class="media">
           <div class="media-left">
             <figure class="image is-100x100">
@@ -326,7 +325,6 @@ onUnmounted(() => {
           </div>
         </article>
       </div>
-    </b-notification>
 
     <b-field v-if="isMobile()">
       <p class="control">
