@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, onUnmounted, getCurrentInstance, defineProps, provide, nextTick, computed, watch } from "vue"
-import { BCheckboxButton, BIcon, BTooltip, BNotification, BButton, BField, BInput, BTabs, BTabItem, BModal } from "buefy"
+import { BCheckbox, BIcon, BTooltip, BNotification, BButton, BField, BInput, BTabs, BTabItem, BModal } from "buefy"
 import QRCode from 'qrcode'
 import PasswordManager from "./components/PasswordManager.ce.vue"
 import ClearTextTab from "./components/ClearTextTab.ce.vue"
@@ -12,7 +12,7 @@ import { setAttributes } from "./lib/domUtils.js"
 import { copyToClipboard } from "./lib/clipboardUtils.js"
 import { decodeAndDecompress } from "./lib/compressionUtils.js"
 import { isMobile } from "./lib/mobileUtils.js"
-import { getMinifiedUrl } from "./lib/urlUtils.js"
+import { getMinifiedUrl, resolveMinifiedUrl } from "./lib/urlUtils.js"
 import axios from 'axios'
 
 const props = defineProps({
@@ -41,6 +41,7 @@ const includePasswordInUrl = ref(false)
 // QR code modal state
 const isQRCodeModalOpen = ref(false)
 const qrCodeDataUrl = ref('')
+const minifiedQrCodeDataUrl = ref('')
 
 // Notification reactive variables
 const notifyActive = ref(false)
@@ -129,10 +130,54 @@ const generateMinifiedUrl = async () => {
   await getMinifiedUrl(props.minifyUrl, urlToMinify, store.setMinifiedUrl, notify)
 }
 
+// Handle copy minified URL
+const handleCopyMinifiedUrl = async () => {
+  const url = props.baseUrl + '#' + store.minifiedUrl + (store.includePasswordInUrl && store.password ? '~' + store.password : '')
+  await copyToClipboard(url)
+  notify('Minified URL copied to clipboard!', 'is-success')
+}
+
+// Handle hash that starts with ~
+const handleHashHash = async () => {
+  const hash = window.location.hash.substring(1)
+
+  // Extract the minified hash (remove the leading #)
+  let minifiedHash = hash.substring(1)
+  let passwordPart = ''
+
+  // Check if the minified hash contains a password part (after ~)
+  const hashParts = minifiedHash.split('~')
+  if (hashParts.length > 1) {
+    minifiedHash = hashParts[0]
+    passwordPart = hashParts.slice(1).join('~') // In case there are multiple ~
+  }
+
+  try {
+    notify('Resolving minified URL...', 'is-info')
+    const resolvedPayload = await resolveMinifiedUrl(minifiedHash, props.minifyUrl, notify)
+
+    // Reattach the password part if it exists
+    const finalPayload = passwordPart ? `${resolvedPayload}~${passwordPart}` : resolvedPayload
+
+    // Update the URL hash with the resolved payload
+    window.location.hash = finalPayload
+    // The handleHashChange will be triggered by the hashchange event
+  } catch (error) {
+    console.error('Error resolving minified URL:', error)
+    notify('Could not resolve the minified URL. Please try again.', 'is-danger')
+  }
+}
+
 // Handle hash change to load encrypted content
 const handleHashChange = async () => {
   const hash = window.location.hash.substring(1)
   if (hash) {
+    // Check if hash starts with #
+    if (hash.startsWith('#')) {
+      handleHashHash()
+      return
+    }
+
     // Check if password is included in the URL (separated by ~)
     const parts = hash.split('~')
     const encryptedText = parts[0]
@@ -166,18 +211,50 @@ const handleHashChange = async () => {
 // Provide notify and copyUrl to child components
 provide('notify', notify)
 provide('copyUrl', handleCopyUrl)
+provide('generateMinifiedUrl', generateMinifiedUrl)
 
-// Watch for changes in encodedURL and generate minified URL if enabled
-watch(() => store.encodedURL, async (newUrl) => {
-  if (newUrl && store.generateShortUrl) {
-    await generateMinifiedUrl()
+// Watch for includePasswordInUrl checkbox changes
+watch(() => store.includePasswordInUrl, () => {
+  if (store.encodedURL && store.password) {
+    // Get the base encrypted text (without password)
+    const parts = store.encodedURL.split('~')
+    const encryptedText = parts[0]
+
+    // Update the URL based on checkbox state
+    if (store.includePasswordInUrl) {
+      // Add password to URL
+      store.setEncodedURL(`${encryptedText}~${store.password}`)
+    } else {
+      // Remove password from URL, keep only encrypted text
+      store.setEncodedURL(encryptedText)
+    }
   }
 })
 
-// Watch for generateShortUrl toggle and generate if enabled and URL exists
-watch(() => store.generateShortUrl, async (enabled) => {
-  if (enabled && store.encodedURL) {
-    await generateMinifiedUrl()
+// Watch for changes in encodedURL and generate minified URL if enabled
+// watch(() => store.encodedURL, async (newUrl) => {
+//   if (newUrl && store.generateShortUrl) {
+//     await generateMinifiedUrl()
+//   }
+// })
+
+
+
+// Watch for minified URL changes and generate QR code
+watch(() => store.minifiedUrl, async (newMinifiedUrl) => {
+  if (newMinifiedUrl) {
+    try {
+      const minifiedFullUrl = props.baseUrl + '#' + newMinifiedUrl + (store.includePasswordInUrl && store.password ? '~' + store.password : '')
+      minifiedQrCodeDataUrl.value = await QRCode.toDataURL(minifiedFullUrl, {
+        errorCorrectionLevel: 'H',
+        type: 'image/png',
+        quality: 0.95,
+        margin: 1,
+        width: 400
+      })
+    } catch (error) {
+      console.error('Minified QR code generation error:', error)
+    }
   }
 })
 
@@ -221,17 +298,34 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="pasteref">
+  <div class="pasteref" data-theme="light">
 
     <b-notification v-if="store.minifiedUrl != ''" type="is-info is-light" has-icon icon="ghost" :closable="false">
-      <div>
-        <b>{{ store.minifiedUrl }}</b>
+
+      <div class="box">
+        <article class="media">
+          <div class="media-left">
+            <figure class="image is-100x100">
+              <img v-if="store.minifiedUrl" :src="minifiedQrCodeDataUrl" alt="QR Code"
+                style="width: 100px; height: 100px;" />
+            </figure>
+          </div>
+          <div class="media-content">
+            <div class="content">
+              <b>{{ baseUrl }}#{{ store.minifiedUrl }}{{ store.includePasswordInUrl && store.password ? '~' +
+                store.password : '' }}</b>
+              <a href="#" @click.prevent="handleCopyMinifiedUrl" style="cursor: pointer; margin-left: 0.5rem;">
+                <b-icon icon="content-copy" size="is-small"></b-icon>
+              </a>
+              <p>
+                The shortened URL will last for 72 hours and will be disposed
+                after the first visit, so you should not click it but rather copy
+                it and paste on an email.
+              </p>
+            </div>
+          </div>
+        </article>
       </div>
-      <p>
-        The shortened URL will last for 72 hours and will be disposed
-        after the first visit, so you should not click it but rather copy
-        it and paste on an email.
-      </p>
     </b-notification>
 
     <b-field v-if="isMobile()">
@@ -257,15 +351,22 @@ onUnmounted(() => {
         <b-button type="is-primary" icon-right="open-in-new" :disabled="!store.encodedURL"
           @click="handleOpenInNewTab" />
       </p>
-      <p class="control">
-        <b-tooltip :label="store.generateShortUrl ? 'A new short URL will be generated' : 'No short URL'"
-          position="is-left">
-          <b-checkbox-button v-model="store.generateShortUrl">
-            <b-icon icon="shield-link-variant" class="checkbox-button-icon"></b-icon>
-          </b-checkbox-button>
-        </b-tooltip>
-      </p>
     </b-field>
+
+    <b-field>
+      <b-tooltip :label="store.generateShortUrl ? 'A new short URL will be generated on paste action' : 'No short URL'"
+        position="is-bottom">
+        <b-checkbox v-model="store.generateShortUrl" type="is-primary">Generate short URL</b-checkbox>
+      </b-tooltip>
+      <b-tooltip
+        :label="store.includePasswordInUrl ? 'Password will be included in URL' : 'Password will not be included in URL'"
+        position="is-bottom">
+        <b-checkbox v-model="store.includePasswordInUrl" type="is-warning">
+          Include password in URL
+        </b-checkbox>
+      </b-tooltip>
+    </b-field>
+
 
     <PasswordManager />
 

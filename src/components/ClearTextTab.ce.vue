@@ -11,6 +11,7 @@ import { computed, inject, ref, nextTick } from "vue"
 const store = usePastebinStore()
 const notify = inject('notify')
 const copyUrl = inject('copyUrl')
+const generateMinifiedUrl = inject('generateMinifiedUrl')
 const fileInput = ref(null)
 const video = ref(null)
 const canvas = ref(null)
@@ -40,6 +41,11 @@ const handleEncrypt = async () => {
     // Include password in URL if checkbox is checked
     const encodedUrl = store.includePasswordInUrl ? `${encrypted}~${store.password}` : encrypted
     store.setEncodedURL(encodedUrl)
+
+    // Generate minified URL if enabled
+    if (store.generateShortUrl && generateMinifiedUrl) {
+      await generateMinifiedUrl()
+    }
 
     await copyUrl()
     store.setActiveTab(1) // Switch to Encrypted tab

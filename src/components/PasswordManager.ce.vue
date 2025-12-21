@@ -208,13 +208,6 @@ watch(() => store.password, async (newPassword) => {
           <b-tooltip label="Generate from BIP39 mnemonic" position="is-bottom">
             <b-button @click="isMnemonicModalOpen = true" icon-left="hours-12"></b-button>
           </b-tooltip>
-        </p>        
-        <p class="control">
-          <b-tooltip :label="store.includePasswordInUrl ? 'Password will be included in URL' : 'Password will not be included in URL'" position="is-bottom">
-            <b-checkbox-button v-model="store.includePasswordInUrl">
-              <b-icon icon="open-in-app" class="checkbox-button-icon"></b-icon>
-            </b-checkbox-button>
-          </b-tooltip>
         </p>
       </b-field>
 
