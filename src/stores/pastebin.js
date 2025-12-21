@@ -69,8 +69,13 @@ export const usePastebinStore = defineStore('pastebin', () => {
     includePasswordInUrl.value = include
   }
 
-  const setMinifiedUrl = (url) => {
-    minifiedUrl.value = url
+  const setMinifiedUrl = (url, pwd = '') => {
+    // Include password in minified URL if includePasswordInUrl is enabled and password is provided
+    if (pwd && includePasswordInUrl.value) {
+      minifiedUrl.value = `${url}~${pwd}`
+    } else {
+      minifiedUrl.value = url
+    }
   }
 
   // Handle file loading

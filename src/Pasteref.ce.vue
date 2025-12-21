@@ -127,12 +127,12 @@ const handleCopyQRCode = async () => {
 // Generate minified URL
 const generateMinifiedUrl = async () => {
   const urlToMinify = props.baseUrl + store.encodedURL.split('~')[0]
-  await getMinifiedUrl(props.minifyUrl, urlToMinify, store.setMinifiedUrl, notify)
+  await getMinifiedUrl(props.minifyUrl, urlToMinify, (hash) => store.setMinifiedUrl(hash, store.password), notify)
 }
 
 // Handle copy minified URL
 const handleCopyMinifiedUrl = async () => {
-  const url = props.baseUrl + '#' + store.minifiedUrl + (store.includePasswordInUrl && store.password ? '~' + store.password : '')
+  const url = props.baseUrl + '#' + store.minifiedUrl
   await copyToClipboard(url)
   notify('Minified URL copied to clipboard!', 'is-success')
 }
@@ -214,7 +214,7 @@ provide('copyUrl', handleCopyUrl)
 provide('generateMinifiedUrl', generateMinifiedUrl)
 
 // Watch for includePasswordInUrl checkbox changes
-watch(() => store.includePasswordInUrl, () => {
+watch(() => store.includePasswordInUrl, async () => {
   if (store.encodedURL && store.password) {
     // Get the base encrypted text (without password)
     const parts = store.encodedURL.split('~')
@@ -227,6 +227,36 @@ watch(() => store.includePasswordInUrl, () => {
     } else {
       // Remove password from URL, keep only encrypted text
       store.setEncodedURL(encryptedText)
+    }
+  }
+
+  // Handle minified URL password
+  if (store.minifiedUrl) {
+    const minifiedParts = store.minifiedUrl.split('~')
+    const baseMinifiedUrl = minifiedParts[0]
+
+    if (store.includePasswordInUrl && store.password) {
+      // Add password to minified URL
+      store.setMinifiedUrl(baseMinifiedUrl, store.password)
+    } else {
+      // Remove password from minified URL
+      store.setMinifiedUrl(baseMinifiedUrl)
+    }
+
+    // Regenerate QR code for minified URL
+    if (store.minifiedUrl) {
+      try {
+        const minifiedFullUrl = props.baseUrl + '#' + store.minifiedUrl
+        minifiedQrCodeDataUrl.value = await QRCode.toDataURL(minifiedFullUrl, {
+          errorCorrectionLevel: 'H',
+          type: 'image/png',
+          quality: 0.95,
+          margin: 1,
+          width: 400
+        })
+      } catch (error) {
+        console.error('Minified QR code generation error:', error)
+      }
     }
   }
 })
@@ -244,7 +274,7 @@ watch(() => store.includePasswordInUrl, () => {
 watch(() => store.minifiedUrl, async (newMinifiedUrl) => {
   if (newMinifiedUrl) {
     try {
-      const minifiedFullUrl = props.baseUrl + '#' + newMinifiedUrl + (store.includePasswordInUrl && store.password ? '~' + store.password : '')
+      const minifiedFullUrl = props.baseUrl + '#' + newMinifiedUrl
       minifiedQrCodeDataUrl.value = await QRCode.toDataURL(minifiedFullUrl, {
         errorCorrectionLevel: 'H',
         type: 'image/png',
@@ -311,8 +341,7 @@ onUnmounted(() => {
           </div>
           <div class="media-content">
             <div class="content">
-              <b>{{ baseUrl }}#{{ store.minifiedUrl }}{{ store.includePasswordInUrl && store.password ? '~' +
-                store.password : '' }}</b>
+              <b>{{ baseUrl }}#{{ store.minifiedUrl }}</b>
               <a href="#" @click.prevent="handleCopyMinifiedUrl" style="cursor: pointer; margin-left: 0.5rem;">
                 <b-icon icon="content-copy" size="is-small"></b-icon>
               </a>
